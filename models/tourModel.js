@@ -154,7 +154,7 @@ toursSchema.pre('save', function (next) {
 
 //doc is the doc after save in db
 toursSchema.post('save', (doc, next) => {
-  console.log(doc);
+  //console.log(doc);
   next();
 });
 
@@ -178,10 +178,10 @@ toursSchema.pre(/^find/, function (next) {
 });
 
 //this is the doc after run the query
-toursSchema.post(/^find/, function (docs, next) {
-  console.log(`query took ${Date.now() - this.start} milliseconds`);
-  next();
-});
+//toursSchema.post(/^find/, function (docs, next) {
+//  console.log(`query took ${Date.now() - this.start} milliseconds`);
+//  next();
+//});
 
 //aggregation middleware
 //this is the aggregation before run

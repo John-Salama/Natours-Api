@@ -6,6 +6,7 @@ const mondoSanitize = require('express-mongo-sanitize');
 const xssClean = require('xss-clean');
 const hpp = require('hpp');
 const cookieParser = require('cookie-parser');
+const compression = require('compression');
 
 const tourRouter = require('./routers/tourRouter');
 const userRouter = require('./routers/userRouter');
@@ -44,6 +45,9 @@ app.use(
     ],
   })
 );
+
+//compress the text sent to the client
+app.use(compression());
 
 //serving static files
 app.use(express.static(`${__dirname}/public`));
