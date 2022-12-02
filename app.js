@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const mondoSanitize = require('express-mongo-sanitize');
 const xssClean = require('xss-clean');
 const hpp = require('hpp');
+const cookieParser = require('cookie-parser');
 
 const tourRouter = require('./routers/tourRouter');
 const userRouter = require('./routers/userRouter');
@@ -20,6 +21,9 @@ app.use(helmet());
 
 //body parser and limit the body to 10kb only
 app.use(express.json({ limit: '10kb' }));
+
+//pares the cookie coming in req
+app.use(cookieParser());
 
 //data sensitization against noSQL query injection
 app.use(mondoSanitize());
