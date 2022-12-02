@@ -7,6 +7,7 @@ const xssClean = require('xss-clean');
 const hpp = require('hpp');
 const cookieParser = require('cookie-parser');
 const compression = require('compression');
+const cors = require('cors');
 
 const tourRouter = require('./routers/tourRouter');
 const userRouter = require('./routers/userRouter');
@@ -15,8 +16,20 @@ const AppError = require('./utils/AppError');
 const globalErrorHandler = require('./controllers/errorController');
 
 const app = express();
-//-----------------------------------------------------------------------------------------------------------------
+app.enable('trust proxy');
+//----------------------------------------------------------------------------------------------------------------
 //GLOBAL MIDDLEWARE
+
+//implement CORS
+app.use(cors());
+//Access-Control-Allow-Origin allow all apps or domain to access our api
+// app.use(cors({
+//   origin: 'https://www.natours.com'
+// }));
+
+//for non-simple requests
+app.options('*', cors());
+
 //set secure http header
 app.use(helmet());
 

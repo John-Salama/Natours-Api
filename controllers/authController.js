@@ -14,16 +14,15 @@ const signToken = (id) =>
     expiresIn: process.env.JWT_EXPIRES_IN,
   });
 
-const createSendToken = (user, status, res) => {
+const createSendToken = (user, status, req, res) => {
   const token = signToken(user._id);
-  const cookieOption = {
+  res.cookie('jwt', token, {
     expires: new Date(
       Date.now() + process.env.JWT_COOKIE_EXPIRES_IN * 24 * 60 * 60 * 1000
     ),
     httpOnly: true,
-  };
-  if (process.env.NODE_ENV === 'production') cookieOption.secure = true;
-  res.cookie('jwt', token, cookieOption);
+    secure: req.secure || req.headers['x-forwarded-proto'] === 'https',
+  });
   user.password = undefined; //remove password from show in response
   res.status(status).json({
     status: 'success',
@@ -48,7 +47,7 @@ exports.signup = catchAsync(async (req, res, next) => {
   //payload = { id: newUser._id } user id
   //secret is = process.env.JWT_SECRET
   //token expire date = {expiresIn: process.env.JWT_EXPIRES_IN,}
-  createSendToken(newUser, 201, res);
+  createSendToken(newUser, 201, req, res);
 });
 
 exports.login = catchAsync(async (req, res, next) => {
@@ -65,7 +64,7 @@ exports.login = catchAsync(async (req, res, next) => {
     return next(new AppError('incorrect email or password', 401));
 
   //if all ok send token
-  createSendToken(user, 200, res);
+  createSendToken(user, 200, req, res);
 });
 
 exports.logout = (req, res) => {
@@ -188,7 +187,7 @@ exports.resetPassword = catchAsync(async (req, res, next) => {
   //at mongo middleware
 
   //4)send the jwt and log the user in
-  createSendToken(user, 200, res);
+  createSendToken(user, 200, req, res);
 });
 
 exports.updatePassword = catchAsync(async (req, res, next) => {
@@ -205,5 +204,5 @@ exports.updatePassword = catchAsync(async (req, res, next) => {
   await user.save();
 
   //4)log user in send the token
-  createSendToken(user, 200, res);
+  createSendToken(user, 200, req, res);
 });
