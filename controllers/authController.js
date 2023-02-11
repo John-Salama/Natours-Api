@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const User = require('../models/userModel');
 const AppError = require('../utils/AppError');
-const sendEmail = require('../utils/email');
+const Email = require('../utils/email');
 
 const catchAsync = require('../utils/catchAsync');
 //thats to prevent anyone to signup as an admin
@@ -34,7 +34,7 @@ const createSendToken = (user, status, req, res) => {
 };
 
 exports.signup = catchAsync(async (req, res, next) => {
-  const newUser = await User.create({
+  await User.create({
     name: req.body.name,
     email: req.body.email,
     password: req.body.password,
@@ -42,12 +42,7 @@ exports.signup = catchAsync(async (req, res, next) => {
     passwordChangedAt: req.body.passwordChangedAt,
     role: req.body.role,
   });
-
-  //create the token to send it to the user to login after the signup
-  //payload = { id: newUser._id } user id
-  //secret is = process.env.JWT_SECRET
-  //token expire date = {expiresIn: process.env.JWT_EXPIRES_IN,}
-  createSendToken(newUser, 201, req, res);
+  next();
 });
 
 exports.login = catchAsync(async (req, res, next) => {
@@ -138,14 +133,8 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
     'host'
   )}/api/v1/users/resetPassword/${resetToken}`;
 
-  const message = `forgot your password submit a patch request to ${resetURL} with your new password and passwordConfirmation. if you did not forgot the password ignore that mail`;
-
   try {
-    await sendEmail({
-      email: req.body.email,
-      subject: 'reset you password (valid for 10 min)',
-      message,
-    });
+    await new Email(user, resetURL).sendPasswordReset();
     res.status(200).json({
       status: 'success',
       message: 'token sent to email',
@@ -160,6 +149,68 @@ exports.forgotPassword = catchAsync(async (req, res, next) => {
       500
     );
   }
+});
+
+exports.sendVerificationEmail = catchAsync(async (req, res, next) => {
+  //1)get user  from posted email
+  const user = await User.findOne({ email: req.body.email });
+
+  //2)generate user token
+  const verificationToken = user.createEmailVerificationToken();
+  await user.save({ validateBeforeSave: false }); //save the changes and leave the unchanged fields
+
+  //3)send it to user email
+  const resetURL = `${req.protocol}://${req.get(
+    'host'
+  )}/api/v1/users/verifyEmail/${verificationToken}`;
+
+  try {
+    await new Email(user, resetURL).sendEmailVerification();
+    res.status(200).json({
+      status: 'success',
+      message: 'verification token sent to email',
+    });
+  } catch (err) {
+    //delete the data we create in createPasswordResetToken(); from database
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save({ validateBeforeSave: false });
+    return next(
+      new AppError('error while sending the email please try again later'),
+      500
+    );
+  }
+});
+
+exports.verifyEmail = catchAsync(async (req, res, next) => {
+  //1)get user passed on the token
+  //hash the token to compare it with that in db
+  const hashedToken = crypto
+    .createHash('sha256')
+    .update(req.params.token)
+    .digest('hex');
+  //get user thats matches the token and expires date greater than now
+  const user = await User.findOne({
+    emailVerificationToken: hashedToken,
+    emailVerificationExpires: { $gt: Date.now() },
+  });
+
+  //2)if there is user and token dose not expires reset the password
+  if (!user) return next(new AppError('Token is invalid or expires'), 400);
+  user.emailVerified = true;
+  user.emailVerificationToken = undefined;
+  user.emailVerificationExpires = undefined;
+  await user.save();
+
+  createSendToken(user, 200, req, res);
+});
+
+exports.isEmailVerified = catchAsync(async (req, res, next) => {
+  const user = await User.find({ email: req.body.email });
+  console.log(user);
+  if (user.emailVerified === false)
+    return next(new AppError('you have to verify your email first'), 401);
+  next();
 });
 
 exports.resetPassword = catchAsync(async (req, res, next) => {

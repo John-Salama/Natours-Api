@@ -22,6 +22,7 @@ const userSchema = new mongoose.Schema({
   },
   photo: {
     type: String,
+    default: 'default.jpg',
   },
   role: {
     type: String,
@@ -38,6 +39,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, 'user must have a password'],
     minlength: [8, 'password must have more or equal then 8 characters'],
+    select: false,
     //work only at save or create into DB
     validate: {
       validator: function (val) {
@@ -46,9 +48,15 @@ const userSchema = new mongoose.Schema({
       message: 'passwords are not the same',
     },
   },
+  emailVerified: {
+    type: Boolean,
+    default: false,
+  },
   passwordChangedAt: Date,
   passwordResetToken: String,
   passwordResetExpires: Date,
+  emailVerificationToken: String,
+  emailVerificationExpires: Date,
   active: {
     type: Boolean,
     default: true,
@@ -100,6 +108,20 @@ userSchema.methods.createPasswordResetToken = function () {
   this.passwordResetExpires = Date.now() + 10 * 60 * 1000;
   //return the unHashed token
   return resetToken;
+};
+
+userSchema.methods.createEmailVerificationToken = function () {
+  //create the random token
+  const verificationToken = crypto.randomBytes(32).toString('hex');
+  //hash and save it in db
+  this.emailVerificationToken = crypto
+    .createHash('sha256')
+    .update(verificationToken)
+    .digest('hex');
+  //make expire time in db
+  this.emailVerificationExpires = Date.now() + 10 * 60 * 1000;
+  //return the unHashed token
+  return verificationToken;
 };
 
 const User = mongoose.model('User', userSchema);
