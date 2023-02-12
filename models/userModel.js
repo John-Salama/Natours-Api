@@ -52,16 +52,15 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  active: {
+    type: Boolean,
+    default: true,
+  },
   passwordChangedAt: Date,
   passwordResetToken: String,
   passwordResetExpires: Date,
   emailVerificationToken: String,
   emailVerificationExpires: Date,
-  active: {
-    type: Boolean,
-    default: true,
-    select: false,
-  },
 });
 
 //check if password is modified and hash it

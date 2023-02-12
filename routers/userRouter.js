@@ -9,11 +9,18 @@ router.post(
   authController.signup,
   authController.sendVerificationEmail
 );
-router.post('/login', authController.isEmailVerified, authController.login);
+router.post(
+  '/login',
+  authController.isActivated,
+  authController.isEmailVerified,
+  authController.login
+);
 router.get('/logout', authController.logout);
 router.post('/forgotPassword', authController.forgotPassword);
 router.patch('/resetPassword/:token', authController.resetPassword);
 router.get('/verifyEmail/:token', authController.verifyEmail);
+router.get('/reactivate/:email', authController.activateAccount);
+///api/v1/reactivate/
 
 router.use(authController.protect);
 

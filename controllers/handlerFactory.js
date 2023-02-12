@@ -1,14 +1,19 @@
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/AppError');
 const APIFeatures = require('../utils/apiFeatures');
+const awsFeatures = require('../utils/awsFeatures');
 
 exports.deleteOne = (Model) =>
   catchAsync(async (req, res, next) => {
-    const doc = await Model.findByIdAndDelete(req.params.id);
+    const doc = await Model.findById(req.params.id);
 
     if (!doc) {
       return next(new AppError('No document found with that ID', 404));
     }
+
+    if (!doc.photo.startsWith('https://')) awsFeatures.deleteAwsFile(doc.photo);
+
+    await Model.findByIdAndDelete(req.params.id);
 
     res.status(204).json({
       status: 'success',
@@ -27,6 +32,9 @@ exports.updateOne = (Model) =>
       return next(new AppError('No document found with that ID', 404));
     }
 
+    if (!doc.photo.startsWith('https://'))
+      doc.photo = awsFeatures.getSignedUrlAws(doc.photo);
+
     res.status(200).json({
       status: 'success',
       data: {
@@ -38,7 +46,8 @@ exports.updateOne = (Model) =>
 exports.createOne = (Model) =>
   catchAsync(async (req, res, next) => {
     const doc = await Model.create(req.body);
-
+    if (!doc.photo.startsWith('https://'))
+      doc.photo = awsFeatures.getSignedUrlAws(doc.photo);
     res.status(201).json({
       status: 'success',
       data: {
@@ -56,6 +65,8 @@ exports.getOne = (Model, popOptions) =>
     if (!doc) {
       return next(new AppError('No document found with that ID', 404));
     }
+    if (!doc.photo.startsWith('https://'))
+      doc.photo = awsFeatures.getSignedUrlAws(doc.photo);
 
     res.status(200).json({
       status: 'success',
@@ -79,12 +90,17 @@ exports.getAll = (Model) =>
     // const doc = await features.query.explain();
     const doc = await features.query;
 
-    // SEND RESPONSE
+    const newDocs = doc.map((el) => {
+      if (!el.photo.startsWith('https')) {
+        el.photo = awsFeatures.getSignedUrlAws(el.photo);
+      }
+      return el;
+    });
     res.status(200).json({
       status: 'success',
       results: doc.length,
       data: {
-        data: doc,
+        data: newDocs,
       },
     });
   });

@@ -194,7 +194,6 @@ exports.verifyEmail = catchAsync(async (req, res, next) => {
     emailVerificationToken: hashedToken,
     emailVerificationExpires: { $gt: Date.now() },
   });
-
   //2)if there is user and token dose not expires reset the password
   if (!user) return next(new AppError('Token is invalid or expires'), 400);
   user.emailVerified = true;
@@ -207,7 +206,6 @@ exports.verifyEmail = catchAsync(async (req, res, next) => {
 
 exports.isEmailVerified = catchAsync(async (req, res, next) => {
   const user = await User.find({ email: req.body.email });
-  console.log(user);
   if (user.emailVerified === false)
     return next(new AppError('you have to verify your email first'), 401);
   next();
@@ -256,4 +254,22 @@ exports.updatePassword = catchAsync(async (req, res, next) => {
 
   //4)log user in send the token
   createSendToken(user, 200, req, res);
+});
+
+exports.isActivated = catchAsync(async (req, res, next) => {
+  const user = await User.find({ email: req.body.email });
+  if (!user[0].active) {
+    return next(new AppError('you have to activate your account first'), 401);
+  }
+  next();
+});
+
+exports.activateAccount = catchAsync(async (req, res, next) => {
+  const user = await User.find({ email: req.params.email });
+  user[0].active = true;
+  await user[0].save();
+  res.status(200).json({
+    status: 'success',
+    message: 'account activated',
+  });
 });

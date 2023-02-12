@@ -71,4 +71,11 @@ module.exports = class Email {
       'Verify your email address to complete your registration'
     );
   }
+
+  async sendReactivationEmail() {
+    await this.send(
+      'welcome',
+      'reactivate your account to continue using our services'
+    );
+  }
 };

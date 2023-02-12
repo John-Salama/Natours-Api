@@ -4,7 +4,8 @@ const User = require('../models/userModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/AppError');
 const handlerFactory = require('./handlerFactory');
-const AWS_S3 = require('../utils/awsS3');
+const awsFeatures = require('../utils/awsFeatures');
+const Email = require('../utils/email');
 
 //save the image in the memory
 const multerStorage = multer.memoryStorage();
@@ -20,26 +21,24 @@ const upload = multer({
   fileFilter: multerFilter,
 });
 
-const awsOptions = {
-  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-  secretAccessKey: process.env.AWS_SECRET_KEY,
-  Bucket: process.env.AWS_BUCKET_NAME,
-};
-
-const aws = new AWS_S3(awsOptions);
-
 exports.uploadUserPhoto = upload.single('photo');
 
 exports.resizeUserPhoto = catchAsync(async (req, res, next) => {
   if (!req.file) return next();
   req.file.filename = `user-${req.user.id}-${Date.now()}.jpeg`;
+  const imagePath = `images/users/${req.file.filename}`;
   const sharpResult = await sharp(req.file.buffer)
     .resize(500, 500)
     .toFormat('jpeg')
     .jpeg({ quality: 90 })
     .toBuffer();
-  const result = await aws.uploadPhoto(req.file.filename, 'users', sharpResult);
-  req.photoURL = result;
+
+  const signedURL = await awsFeatures.uploadAwsAndGetSignedURL(
+    sharpResult,
+    imagePath
+  );
+  req.photoPath = imagePath;
+  req.signedURL = signedURL;
   next();
 });
 
@@ -68,21 +67,51 @@ exports.updateMe = catchAsync(async (req, res, next) => {
     );
   //update user docs
   const filteredObj = filterObj(req.body, 'name', 'email');
-  if (req.file) filteredObj.photo = req.photoURL;
+  const user = await User.findById(req.user._id);
+  if (!user.photo.startsWith('https://')) awsFeatures.deleteAwsFile(user.photo);
+
+  if (req.file) filteredObj.photo = req.photoPath;
+  if (filteredObj.email) {
+    user.emailVerified = false;
+    const verificationToken = user.createEmailVerificationToken();
+    user.email = filteredObj.email;
+    await user.save({ validateBeforeSave: false });
+
+    const resetURL = `${req.protocol}://${req.get(
+      'host'
+    )}/api/v1/users/verifyEmail/${verificationToken}`;
+    try {
+      await new Email(user, resetURL).sendEmailVerification();
+    } catch {
+      user.emailVerificationToken = undefined;
+      user.emailVerificationExpires = undefined;
+      await user.save({ validateBeforeSave: false });
+      return next(
+        new AppError('error while sending the email please try again later'),
+        500
+      );
+    }
+  }
   const updatedUser = await User.findByIdAndUpdate(req.user._id, filteredObj, {
     new: true,
     runValidators: true,
   });
+  const finalUser = updatedUser;
+  finalUser.photo = req.signedURL;
   res.status(200).json({
     status: 'success',
     data: {
-      user: updatedUser,
+      user: finalUser,
     },
   });
 });
 
 exports.deleteMe = catchAsync(async (req, res, next) => {
   await User.findByIdAndUpdate(req.user.id, { active: false });
+  const reactivateURL = `${req.protocol}://${req.get(
+    'host'
+  )}/api/v1/users/reactivate/${req.user.email}`;
+  await new Email(req.user, reactivateURL).sendReactivationEmail();
   res.status(204).json({
     status: 'success',
     data: null,
