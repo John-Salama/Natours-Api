@@ -206,7 +206,7 @@ exports.verifyEmail = catchAsync(async (req, res, next) => {
 
 exports.isEmailVerified = catchAsync(async (req, res, next) => {
   const user = await User.find({ email: req.body.email });
-  if (user.emailVerified === false)
+  if (user[0].emailVerified === false)
     return next(new AppError('you have to verify your email first'), 401);
   next();
 });
