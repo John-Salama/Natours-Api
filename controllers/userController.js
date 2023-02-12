@@ -4,17 +4,7 @@ const User = require('../models/userModel');
 const catchAsync = require('../utils/catchAsync');
 const AppError = require('../utils/AppError');
 const handlerFactory = require('./handlerFactory');
-
-//save the image in the disk
-//const multerStorage = multer.diskStorage({
-//  destination: (req, file, cb) => {
-//    cb(null, 'public/img/users');
-//  },
-//  filename: (req, file, cb) => {
-//    const ext = file.mimetype.split('/')[1];
-//    cb(null, `user-${req.user.id}-${Date.now()}.${ext}`);
-//  },
-//});
+const AWS_S3 = require('../utils/awsS3');
 
 //save the image in the memory
 const multerStorage = multer.memoryStorage();
@@ -30,16 +20,26 @@ const upload = multer({
   fileFilter: multerFilter,
 });
 
+const awsOptions = {
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_KEY,
+  Bucket: process.env.AWS_BUCKET_NAME,
+};
+
+const aws = new AWS_S3(awsOptions);
+
 exports.uploadUserPhoto = upload.single('photo');
 
 exports.resizeUserPhoto = catchAsync(async (req, res, next) => {
   if (!req.file) return next();
   req.file.filename = `user-${req.user.id}-${Date.now()}.jpeg`;
-  await sharp(req.file.buffer)
+  const sharpResult = await sharp(req.file.buffer)
     .resize(500, 500)
     .toFormat('jpeg')
     .jpeg({ quality: 90 })
-    .toFile(`public/img/users/${req.file.filename}`);
+    .toBuffer();
+  const result = await aws.uploadPhoto(req.file.filename, 'users', sharpResult);
+  req.photoURL = result;
   next();
 });
 
@@ -68,7 +68,7 @@ exports.updateMe = catchAsync(async (req, res, next) => {
     );
   //update user docs
   const filteredObj = filterObj(req.body, 'name', 'email');
-  if (req.file) filteredObj.photo = req.file.filename;
+  if (req.file) filteredObj.photo = req.photoURL;
   const updatedUser = await User.findByIdAndUpdate(req.user._id, filteredObj, {
     new: true,
     runValidators: true,
