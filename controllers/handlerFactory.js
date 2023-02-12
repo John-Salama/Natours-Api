@@ -11,7 +11,12 @@ exports.deleteOne = (Model) =>
       return next(new AppError('No document found with that ID', 404));
     }
 
-    if (!doc.photo.startsWith('https://')) awsFeatures.deleteAwsFile(doc.photo);
+    if (
+      doc.photo &&
+      !doc.photo.startsWith('https://') &&
+      doc.photo !== 'default.jpg'
+    )
+      awsFeatures.deleteAwsFile(doc.photo);
 
     await Model.findByIdAndDelete(req.params.id);
 
@@ -32,7 +37,11 @@ exports.updateOne = (Model) =>
       return next(new AppError('No document found with that ID', 404));
     }
 
-    if (!doc.photo.startsWith('https://'))
+    if (
+      doc.photo &&
+      !doc.photo.startsWith('https://') &&
+      doc.photo !== 'default.jpg'
+    )
       doc.photo = awsFeatures.getSignedUrlAws(doc.photo);
 
     res.status(200).json({
@@ -46,7 +55,11 @@ exports.updateOne = (Model) =>
 exports.createOne = (Model) =>
   catchAsync(async (req, res, next) => {
     const doc = await Model.create(req.body);
-    if (!doc.photo.startsWith('https://'))
+    if (
+      doc.photo &&
+      !doc.photo.startsWith('https://') &&
+      doc.photo !== 'default.jpg'
+    )
       doc.photo = awsFeatures.getSignedUrlAws(doc.photo);
     res.status(201).json({
       status: 'success',
@@ -65,7 +78,11 @@ exports.getOne = (Model, popOptions) =>
     if (!doc) {
       return next(new AppError('No document found with that ID', 404));
     }
-    if (!doc.photo.startsWith('https://'))
+    if (
+      doc.photo &&
+      !doc.photo.startsWith('https://') &&
+      doc.photo !== 'default.jpg'
+    )
       doc.photo = awsFeatures.getSignedUrlAws(doc.photo);
 
     res.status(200).json({
@@ -91,7 +108,11 @@ exports.getAll = (Model) =>
     const doc = await features.query;
 
     const newDocs = doc.map((el) => {
-      if (!el.photo.startsWith('https')) {
+      if (
+        el.photo &&
+        !el.photo.startsWith('https://') &&
+        el.photo !== 'default.jpg'
+      ) {
         el.photo = awsFeatures.getSignedUrlAws(el.photo);
       }
       return el;
