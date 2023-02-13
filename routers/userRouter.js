@@ -19,8 +19,8 @@ router.get('/logout', authController.logout);
 router.post('/forgotPassword', authController.forgotPassword);
 router.patch('/resetPassword/:token', authController.resetPassword);
 router.get('/verifyEmail/:token', authController.verifyEmail);
-router.get('/reactivate/:email', authController.activateAccount);
-///api/v1/reactivate/
+router.get('/reactivate/:id', authController.activateAccount);
+router.post('/resendVerificationEmail', authController.resendVerificationEmail);
 
 router.use(authController.protect);
 

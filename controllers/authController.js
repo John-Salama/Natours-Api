@@ -182,6 +182,39 @@ exports.sendVerificationEmail = catchAsync(async (req, res, next) => {
   }
 });
 
+exports.resendVerificationEmail = catchAsync(async (req, res, next) => {
+  const user = await User.findOne({ email: req.body.email });
+  if (!user) return next(new AppError('user not found', 404));
+  if (user.emailVerified)
+    return next(new AppError('email already verified', 400));
+
+  //2)generate user token
+  const verificationToken = user.createEmailVerificationToken();
+  await user.save({ validateBeforeSave: false }); //save the changes and leave the unchanged fields
+
+  //3)send it to user email
+  const resetURL = `${req.protocol}://${req.get(
+    'host'
+  )}/api/v1/users/verifyEmail/${verificationToken}`;
+
+  try {
+    await new Email(user, resetURL).sendEmailVerification();
+    res.status(200).json({
+      status: 'success',
+      message: 'verification token sent to email',
+    });
+  } catch (err) {
+    //delete the data we create in createPasswordResetToken(); from database
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+    await user.save({ validateBeforeSave: false });
+    return next(
+      new AppError('error while sending the email please try again later'),
+      500
+    );
+  }
+});
+
 exports.verifyEmail = catchAsync(async (req, res, next) => {
   //1)get user passed on the token
   //hash the token to compare it with that in db
@@ -265,9 +298,12 @@ exports.isActivated = catchAsync(async (req, res, next) => {
 });
 
 exports.activateAccount = catchAsync(async (req, res, next) => {
-  const user = await User.find({ email: req.params.email });
-  user[0].active = true;
-  await user[0].save();
+  const user = await User.findById(req.params.id);
+  console.log(user, req.params.id);
+  if (!user) return next(new AppError('user not found'), 404);
+  if (user.active) return next(new AppError('account already activated'), 400);
+  user.active = true;
+  await user.save();
   res.status(200).json({
     status: 'success',
     message: 'account activated',

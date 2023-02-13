@@ -110,7 +110,7 @@ exports.deleteMe = catchAsync(async (req, res, next) => {
   await User.findByIdAndUpdate(req.user.id, { active: false });
   const reactivateURL = `${req.protocol}://${req.get(
     'host'
-  )}/api/v1/users/reactivate/${req.user.email}`;
+  )}/api/v1/users/reactivate/${req.user.id}`;
   await new Email(req.user, reactivateURL).sendReactivationEmail();
   res.status(204).json({
     status: 'success',
